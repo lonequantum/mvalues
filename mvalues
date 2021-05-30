@@ -1,0 +1,113 @@
+#!/bin/sh
+
+test -n "$1" || {
+	echo "Generates a list of math values, one per line."
+	echo "This script uses bc internally."
+	echo
+	echo "Usage:"
+	echo "mvalues constant|linear|sine {specific mode args}"
+	echo
+	echo "Examples:"
+	echo "mvalues constant 8.2 14            # 8.2, 14 times. Also accepts any string that must be repeated."
+	echo "mvalues linear 86 81.1 7           # 7 equally separated values from 86 to 81.1 (bounds included)."
+	echo "mvalues linear 1.02 44.055 7       # Idem from 1.020 to 44.055."
+	echo "mvalues sine tau/8 tau/2 5 4.8 19  # sin(x) * 5 + 4.8, for 19 equally separated values of x from tau/8 to tau/2 (bounds included)."
+	echo
+	echo "Environment:"
+	echo "SCALE: setter for bc's scale variable, default = 3".
+	exit
+}
+mode=$1
+shift
+
+SCALE=${SCALE-3}
+
+remove_useless_zeros() {
+	while read value; do
+		echo $value | sed '/\./ s/\.\{0,1\}0\{1,\}$//'
+	done
+}
+
+case $mode in
+constant)
+	test $# -eq 2 || {
+		echo 2 args required for constant mode >&2
+		echo value ntimes >&2
+		exit 64
+	}
+	value=$1; ntimes=$2
+
+	test $ntimes -ge 1 || {
+		echo ntimes must be \>= 1 >&2
+		exit 1
+	}
+
+	while test $ntimes -gt 0; do
+		echo $value
+		ntimes=$(expr $ntimes - 1)
+	done
+	exit 0;;
+
+linear)
+	test $# -eq 3 || {
+		echo 3 args required for linear mode >&2
+		echo bound1 bound2 nvalues >&2
+		exit 64
+	}
+	bound1=$1; bound2=$2; nvalues=$3
+
+	test $(echo "$bound1 != $bound2" | bc) -eq 1 || {
+		echo bound1 and bound2 must be different >&2
+		exit 1
+	}
+	test $nvalues -ge 2 || {
+		echo nvalues must be \>= 2 >&2
+		exit 1
+	}
+
+	nvalues=$(expr $nvalues - 1)
+	step=$(echo "scale=$SCALE; ($bound2 - $bound1) / $nvalues" | bc)
+
+	{
+		echo $bound1
+		while test $nvalues -gt 1; do
+			nvalues=$(expr $nvalues - 1)
+			echo "scale=$SCALE; $bound2 - $nvalues * $step" | bc
+		done
+		echo $bound2
+	} | remove_useless_zeros
+	exit 0;;
+
+sine)
+	test  $# -eq 5 || {
+		echo 5 args required for sine mode >&2
+		echo rad1 rad2 multiplier adder nvalues >&2
+		exit 64
+	}
+	rad1=$1; rad2=$2; multiplier=$3; adder=$4; nvalues=$5
+	TAU=6.2831853071795
+
+	test $(echo "tau=$TAU; ($rad1) <= ($rad2)" | bc) -eq 1 || {
+		echo rad1 must be \<= rad2 >&2
+		exit 1
+	}
+	test $nvalues -ge 1 || {
+		echo nvalues must be \>= 1 >&2
+		exit 1
+	}
+
+	nvalues=$(expr $nvalues - 1)
+	test $nvalues -gt 0 && step=$(echo "scale=$SCALE; tau=$TAU; (($rad2) - ($rad1)) / $nvalues" | bc)
+
+	{
+		echo "scale=$SCALE; tau=$TAU; s($rad1) * $multiplier + $adder" | bc -l
+		while test $nvalues -gt 0; do
+			nvalues=$(expr $nvalues - 1)
+			echo "scale=$SCALE; tau=$TAU; s($rad2 - $nvalues * $step) * $multiplier + $adder" | bc -l
+		done
+	} | remove_useless_zeros
+	exit 0;;
+
+*)	echo \'$mode\' is not a valid mode >&2
+	exit 1;;
+esac
