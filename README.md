@@ -22,3 +22,4 @@ SCALE: setter for bc's scale variable, default = 3.
 ## TODO
 - Currently this is a POSIX shell script, perhaps it would be good to rewrite this project in C.
 - Add support for custom functions.
+- Add more checks on input.
