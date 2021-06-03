@@ -1,5 +1,6 @@
 # mvalues
 Math values generator
+More precisely, it outputs a series of values whose calculation involves a specified range.
 
 Calling the mvalues script without argument displays this help:
 ```
