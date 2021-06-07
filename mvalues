@@ -1,5 +1,11 @@
 #!/bin/sh
 
+TAU=6.283185307179586476925286766559005768394338798750211641949889184615633
+internal_scale=$(echo "scale($TAU)" | bc)
+mvalues_round_default=3
+mvalues_round_max=$(expr $internal_scale - 3)
+mvalues_round_min=-$mvalues_round_max
+
 test -n "$1" || {
 	echo "Generates a list of math values, one per line."
 	echo "This script uses bc internally."
@@ -8,38 +14,95 @@ test -n "$1" || {
 	echo "mvalues constant|linear|sine {specific mode args}"
 	echo
 	echo "Examples:"
-	echo "mvalues constant 8.2 14              # 8.2, 14 times. Also accepts any string that must be repeated."
-	echo "mvalues linear 86 81.1 7             # 7 equally separated values from 86 to 81.1 (bounds included)."
-	echo "mvalues linear 1.02 44.055 7         # Idem in [1.02, 44.055]."
-	echo "mvalues sine tau/8 tau/2 15 10 a 19  # sin(x) scaled to a series that starts at 15 and ends at 10 (with a peak that is (a)utomatically computed), for 19 equally separated values of x from tau/8 to tau/2 (bounds included)."
+	echo "mvalues constant 8.2 14        # 8.2, 14 times. Also accepts any string that must be repeated."
+	echo "mvalues linear 86 81.1 7       # 7 equally separated values from 86 to 81.1 (bounds included)."
+	echo "mvalues sine 45 180 15 10 a 9  # sin(x) scaled to a series that starts at 15 and ends at 10 (with a peak that is (a)utomatically computed in this case), for 9 equally separated values of x from 45 to 180 degrees (bounds included)."
 	echo
 	echo "Environment:"
-	echo "SCALE: setter for bc's scale variable, default = 3".
+	echo "MVALUES_ROUND: output precision (maximum number of digits after decimal point)"
+	echo "               if >= 0, value will be rounded"
+	echo "               if < 0, value will be truncated after -MVALUES_ROUND digits"
+	echo "               default = $mvalues_round_default, max = $mvalues_round_max, min = $mvalues_round_min"
 	exit
 }
 mode=$1
 shift
 
-SCALE=${SCALE-3}
-TAU=6.2831853071795
+MVALUES_ROUND=${MVALUES_ROUND:-$mvalues_round_default}
+test $MVALUES_ROUND -le $mvalues_round_max || {
+	MVALUES_ROUND=$mvalues_round_max
+	echo "warning: MVALUES_ROUND out of range, value $mvalues_round_max will be used" >&2
+}
+test $MVALUES_ROUND -ge $mvalues_round_min || {
+	MVALUES_ROUND=$mvalues_round_min
+	echo "warning: MVALUES_ROUND out of range, value $mvalues_round_min will be used" >&2
+}
 
-remove_useless_zeros() {
+remove_trailing_zeros() {
 	while read value; do
 		echo $value | sed '/\./ s/\.\{0,1\}0\{1,\}$//'
 	done
 }
 
+filter_output() {
+	while read output; do
+		echo $output | sed 's/[^-0-9.]//g'
+	done
+}
+
+bc_round='
+define r(number, ndigits) {
+	auto r
+	if (number < 0)
+		return -r(-number, ndigits)
+	scale = '$internal_scale'
+	r = number + 0.5 * 10^-ndigits
+	scale = ndigits
+	r = r/1
+	scale = '$internal_scale'
+	return r
+}'
+
+round() {
+	while read value; do
+		if test $1 -ge 0; then
+			echo "$bc_round r($value, $1)" | bc | filter_output
+		else
+			ndigits=$(expr 0 - $1)
+			echo $value | sed "s/\([-0-9]*\.\{0,1\}[0-9]\{0,$ndigits\}\)[0-9]\{0,\}/\1/"
+		fi
+	done
+}
+
+compare_values() {
+	if test $(echo "$1 == $2" | bc) -eq 1; then
+		echo '='
+	elif test $(echo "$1 < $2" | bc) -eq 1; then
+		echo '<'
+	else
+		echo '>'
+	fi
+}
+
+degrees2radians() {
+	echo "scale = $internal_scale; $1 * $TAU / 360" | bc | filter_output
+}
+
+sin() {
+	echo "scale = $internal_scale; s($1)" | bc -l | filter_output
+}
+
 case $mode in
 constant)
 	test $# -eq 2 || {
-		echo 2 args required for constant mode >&2
-		echo value ntimes >&2
+		echo "2 args required for constant mode" >&2
+		echo "value ntimes" >&2
 		exit 64
 	}
 	value=$1; ntimes=$2
 
 	test $ntimes -ge 2 || {
-		echo ntimes must be \>= 2 >&2
+		echo "ntimes must be >= 2" >&2
 		exit 1
 	}
 
@@ -51,64 +114,85 @@ constant)
 
 linear)
 	test $# -eq 3 || {
-		echo 3 args required for linear mode >&2
-		echo bound1 bound2 nvalues >&2
+		echo "3 args required for linear mode" >&2
+		echo "start end nvalues" >&2
 		exit 64
 	}
-	bound1=$1; bound2=$2; nvalues=$3
+	start=$1; end=$2; nvalues=$3
 
-	test $(echo "$bound1 != $bound2" | bc) -eq 1 || {
-		echo bound1 and bound2 must be different >&2
+	test $(echo "$start != $end" | bc) -eq 1 || {
+		echo "start and end must be different" >&2
 		exit 1
 	}
 	test $nvalues -ge 2 || {
-		echo nvalues must be \>= 2 >&2
+		echo "nvalues must be >= 2" >&2
 		exit 1
 	}
 
 	nvalues=$(expr $nvalues - 1)
-	step=$(echo "scale=$SCALE; ($bound2 - $bound1) / $nvalues" | bc)
+	step=$(echo "scale = $internal_scale; ($end - $start) / $nvalues" | bc | filter_output)
 
 	{
-		echo $bound1
+		echo $start
 		while test $nvalues -gt 1; do
 			nvalues=$(expr $nvalues - 1)
-			echo "scale=$SCALE; $bound2 - $nvalues * $step" | bc
+			echo "$end - $nvalues * $step" | bc | filter_output
 		done
-		echo $bound2
-	} | remove_useless_zeros
+		echo $end
+	} | round $MVALUES_ROUND | remove_trailing_zeros
 	exit 0;;
 
 sine)
 	test  $# -eq 6 || {
-		echo 6 args required for sine mode >&2
-		echo rad1 rad2 start end peak nvalues >&2
+		echo "6 args required for sine mode" >&2
+		echo "deg1 deg2 start end {peak or 'a'} nvalues" >&2
 		exit 64
 	}
-	rad1=$1; rad2=$2; start=$3; end=$4; peak=$5; nvalues=$6
+	deg1=$1; deg2=$2; start=$3; end=$4; peak=$5; nvalues=$6
 
-	test $(echo "tau=$TAU; ($rad1) != ($rad2)" | bc) -eq 1 || {
-		echo rad1 and rad2 must be different >&2
+	test $(compare_values $deg1 $deg2) != '=' || {
+		echo "deg1 and deg2 must be different" >&2
 		exit 1
 	}
 	test $nvalues -ge 2 || {
-		echo nvalues must be \>= 2 >&2
+		echo "nvalues must be >= 2" >&2
 		exit 1
 	}
 
-	#nvalues=$(expr $nvalues - 1)
-	#step=$(echo "scale=$SCALE; tau=$TAU; (($rad2) - ($rad1)) / $nvalues" | bc)
+	rad1=$(degrees2radians $deg1)
+	rad2=$(degrees2radians $deg2)
+	s_rad1=$(sin $rad1)
+	s_rad2=$(sin $rad2)
 
-	#{
-	#	echo "scale=$SCALE; tau=$TAU; s($rad1) * $multiplier + $adder" | bc -l
-	#	while test $nvalues -gt 0; do
-	#		nvalues=$(expr $nvalues - 1)
-	#		echo "scale=$SCALE; tau=$TAU; s($rad2 - $nvalues * $step) * $multiplier + $adder" | bc -l
-	#	done
-	#} | remove_useless_zeros
-	echo TO BE IMPLEMENTED >&2
-	exit 1;;
+	test $(compare_values $start $end) = $(compare_values $s_rad1 $s_rad2) || {
+		echo "inconsistent sine command, sin(deg1) must compare to sin(deg2) like start compares to end" >&2
+		exit 1
+	}
 
-*)	echo \'$mode\' is not a valid mode >&2
+	nvalues=$(expr $nvalues - 1)
+	step=$(echo "scale = $internal_scale; ($rad2 - $rad1) / $nvalues" | bc | filter_output)
+
+	if test $(compare_values $start $end) = '='; then
+		echo "THIS CASE IS NOT IMPLEMENTED YET (start == end)" >&2
+		exit 1
+	else
+		test $peak = 'a' || echo "warning: peak not needed when start != end, set it to 'a' to avoid this message" >&2
+
+		multiplier=$(echo "scale = $internal_scale; ($end - $start) / ($s_rad2 - $s_rad1)" | bc | filter_output)
+		adder=$(echo "$start - $multiplier * $s_rad1" | bc | filter_output)
+	fi
+
+	{
+		echo $start
+		while test $nvalues -gt 1; do
+			nvalues=$(expr $nvalues - 1)
+			echo "scale = $internal_scale; s($rad2 - $nvalues * $step) * $multiplier + $adder" | bc -l | filter_output
+		done
+		echo $end
+	} | round $MVALUES_ROUND | remove_trailing_zeros
+	exit 0;;
+
+*)
+	echo "'$mode' is not a valid mode" >&2
 	exit 1;;
 esac
