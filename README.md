@@ -20,9 +20,9 @@ mvalues linear 86 81.1 7       # 7 equally separated values from 86 to 81.1 (bou
 mvalues sine 45 180 15 10 a 9  # sin(x) scaled to a series that starts at 15 and ends at 10 (with a peak that is (a)utomatically computed in this case), for 9 equally separated values of x from 45 to 180 degrees (bounds included).
 
 Environment:
-MVALUES_ROUND: output precision (maximum number of digits after decimal point)
-               if >= 0, value will be rounded
-               if < 0, value will be truncated after -MVALUES_ROUND digits
+MVALUES_ROUND: output precision (maximum number of digits after the decimal point)
+               if >= 0, the values will be rounded (to the nearest)
+               if  < 0, the values will be truncated after -MVALUES_ROUND digits
                default = 3, max = 66, min = -66
 ```
 

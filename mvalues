@@ -19,9 +19,9 @@ test -n "$1" || {
 	echo "mvalues sine 45 180 15 10 a 9  # sin(x) scaled to a series that starts at 15 and ends at 10 (with a peak that is (a)utomatically computed in this case), for 9 equally separated values of x from 45 to 180 degrees (bounds included)."
 	echo
 	echo "Environment:"
-	echo "MVALUES_ROUND: output precision (maximum number of digits after decimal point)"
-	echo "               if >= 0, value will be rounded"
-	echo "               if < 0, value will be truncated after -MVALUES_ROUND digits"
+	echo "MVALUES_ROUND: output precision (maximum number of digits after the decimal point)"
+	echo "               if >= 0, the values will be rounded (to the nearest)"
+	echo "               if  < 0, the values will be truncated after -MVALUES_ROUND digits"
 	echo "               default = $mvalues_round_default, max = $mvalues_round_max, min = $mvalues_round_min"
 	exit
 }
