@@ -74,9 +74,9 @@ round() {
 }
 
 compare_values() {
-	if test $(echo "$1 == $2" | bc) -eq 1; then
+	if test $(printf 'if (%s == %s) {a = 1}; a\n' $1 $2 | bc) -eq 1; then
 		echo '='
-	elif test $(echo "$1 < $2" | bc) -eq 1; then
+	elif test $(printf 'if (%s < %s) {a = 1}; a\n' $1 $2 | bc) -eq 1; then
 		echo '<'
 	else
 		echo '>'
@@ -119,7 +119,7 @@ linear)
 	}
 	start=$1; end=$2; nvalues=$3
 
-	test $(echo "$start != $end" | bc) -eq 1 || {
+	test $(printf 'if (%s != %s) {a = 1}; a\n' $start $end | bc) -eq 1 || {
 		echo "start and end must be different" >&2
 		exit 1
 	}
