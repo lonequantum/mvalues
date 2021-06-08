@@ -160,10 +160,10 @@ sine)
 
 	rad1=$(degrees2radians $deg1)
 	rad2=$(degrees2radians $deg2)
-	s_rad1=$(sin $rad1)
-	s_rad2=$(sin $rad2)
+	sin1=$(sin $rad1)
+	sin2=$(sin $rad2)
 
-	test $(compare_values $start $end) = $(compare_values $s_rad1 $s_rad2) || {
+	test $(compare_values $start $end) = $(compare_values $sin1 $sin2) || {
 		echo "inconsistent sine command, sin(deg1) must compare to sin(deg2) like start compares to end" >&2
 		exit 1
 	}
@@ -177,8 +177,8 @@ sine)
 	else
 		test $peak = 'a' || echo "warning: peak not needed when start != end, set it to 'a' to avoid this message" >&2
 
-		multiplier=$(echo "scale = $internal_scale; ($end - $start) / ($s_rad2 - $s_rad1)" | bc | filter_output)
-		adder=$(echo "$start - $multiplier * $s_rad1" | bc | filter_output)
+		multiplier=$(echo "scale = $internal_scale; ($end - $start) / ($sin2 - $sin1)" | bc | filter_output)
+		adder=$(echo "$start - $multiplier * $sin1" | bc | filter_output)
 	fi
 
 	{
