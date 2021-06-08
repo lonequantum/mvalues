@@ -88,7 +88,13 @@ degrees2radians() {
 }
 
 sin() {
-	echo "scale = $internal_scale; s($1)" | bc -l | filter_output
+	rad=$1
+	# This is needed so we can detect that sin(x) == sin(n⋅TAU + x) precisely
+	while test $(printf 'if (%s > 0) {a = 1}; a\n' $rad | bc -s) -eq 1; do
+		rad=$(echo "$rad - $TAU" | bc | filter_output)
+	done
+
+	echo "scale = $internal_scale; s($rad)" | bc -l | filter_output
 }
 
 case $mode in
