@@ -51,16 +51,15 @@ filter_output() {
 }
 
 bc_round='
-define r(number, ndigits) {
+define r(n, d) {
 	auto r
-	if (number < 0)
-		return -r(-number, ndigits)
+	if (n < 0) return (-r(-n, d))
 	scale = '$internal_scale'
-	r = number + 0.5 * 10^-ndigits
-	scale = ndigits
+	r = n + 0.5 * 10^-d
+	scale = d
 	r = r/1
 	scale = '$internal_scale'
-	return r
+	return (r)
 }'
 
 round() {
