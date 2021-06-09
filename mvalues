@@ -1,9 +1,12 @@
 #!/bin/sh
 
+# Defines what is needed for trigonometry and the scale for intermediary (truncated) results.
 TAU=6.283185307179586476925286766559005768394338798750211641949889184615633
 internal_scale=$(echo "scale($TAU)" | bc)
+
+# Limits for MVALUES_ROUND.
 mvalues_round_default=3
-mvalues_round_max=$(expr $internal_scale - 3)
+mvalues_round_max=$(expr $internal_scale - 3) # distances rounded output values from truncated ones
 mvalues_round_min=-$mvalues_round_max
 
 test -n "$1" || {
@@ -38,18 +41,22 @@ test $MVALUES_ROUND -ge $mvalues_round_min || {
 	echo "warning: MVALUES_ROUND out of range, value $mvalues_round_min will be used" >&2
 }
 
+# For echoing the bare essential.
 remove_trailing_zeros() {
 	while read value; do
 		echo $value | sed '/\./ s/\.\{0,1\}0\{1,\}$//'
 	done
 }
 
+# Depending on the environment, bc may echo escaped newlines; we don't want any undesirable character.
 filter_output() {
 	while read output; do
 		echo $output | sed 's/[^-0-9.]//g'
 	done
 }
 
+# The round() function in bc syntax.
+# n is the number that must be rounded to the nearest, using d digits after the decimal point.
 bc_round='
 define r(n, d) {
 	auto r
@@ -62,6 +69,7 @@ define r(n, d) {
 	return (r)
 }'
 
+# Rounds or truncates what it is piped, depending on $1.
 round() {
 	while read value; do
 		if test $1 -ge 0; then
@@ -73,6 +81,7 @@ round() {
 	done
 }
 
+# Returns how $1 compares to $2.
 compare_values() {
 	if test $(printf 'if (%s == %s) {a = 1}; a\n' $1 $2 | bc) -eq 1; then
 		echo '='
@@ -83,13 +92,15 @@ compare_values() {
 	fi
 }
 
+# Converts $1 degrees to its value in radians.
 degrees2radians() {
 	echo "scale = $internal_scale; $1 * $TAU / 360" | bc | filter_output
 }
 
+# Gives sin($1), with $1 in radians.
 sin() {
 	rad=$1
-	# This is needed so we can detect that sin(x) == sin(n⋅TAU + x) precisely
+	# This is needed so we can correctly detect that sin(x) == sin(n⋅TAU + x).
 	while test $(printf 'if (%s > 0) {a = 1}; a\n' $rad | bc -s) -eq 1; do
 		rad=$(echo "$rad - $TAU" | bc | filter_output)
 	done
@@ -98,6 +109,7 @@ sin() {
 }
 
 case $mode in
+# y = C. Just repeats $value $ntimes times. Nothing else.
 constant)
 	test $# -eq 2 || {
 		echo "2 args required for constant mode" >&2
@@ -117,6 +129,7 @@ constant)
 	done
 	exit 0;;
 
+# y = x, for $nvalues values of x equally separated in [$start, $end].
 linear)
 	test $# -eq 3 || {
 		echo "3 args required for linear mode" >&2
@@ -147,6 +160,10 @@ linear)
 	} | round $MVALUES_ROUND | remove_trailing_zeros
 	exit 0;;
 
+# y = sin(x) * M + A, with M and A automatically computed so the first returned value is $start and the last is $end.
+# Uses $nvalues equally separated values of x in [$deg1, $deg2]. Yes, they must be entered in degrees.
+# $peak must be given if $start == $end, otherwise just set it to 'a'.
+# $peak is the maximum value that can appear in the returned series, when sin(x) == 1. (TODO: define better as the case is implemented)
 sine)
 	test  $# -eq 6 || {
 		echo "6 args required for sine mode" >&2
@@ -178,6 +195,7 @@ sine)
 	step=$(echo "scale = $internal_scale; ($rad2 - $rad1) / $nvalues" | bc | filter_output)
 
 	if test $(compare_values $start $end) = '='; then
+		# TODO
 		echo "THIS CASE IS NOT IMPLEMENTED YET (start == end)" >&2
 		exit 1
 	else
