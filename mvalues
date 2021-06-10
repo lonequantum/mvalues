@@ -104,6 +104,9 @@ sin() {
 	while test $(printf 'if (%s > 0) {a = 1}; a\n' $rad | bc -s) -eq 1; do
 		rad=$(echo "$rad - $TAU" | bc | filter_output)
 	done
+	while test $(printf 'if (%s < 0) {a = 1}; a\n' $rad | bc -s) -eq 1; do
+		rad=$(echo "$rad + $TAU" | bc | filter_output)
+	done
 
 	echo "scale = $internal_scale; s($rad)" | bc -l | filter_output
 }
