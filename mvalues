@@ -83,9 +83,9 @@ round() {
 
 # Returns how $1 compares to $2.
 compare_values() {
-	if test $(printf 'if (%s == %s) {a = 1}; a\n' $1 $2 | bc) -eq 1; then
+	if test $(echo "if ($1 == $2) {a = 1}; a" | bc) -eq 1; then
 		echo '='
-	elif test $(printf 'if (%s < %s) {a = 1}; a\n' $1 $2 | bc) -eq 1; then
+	elif test $(echo "if ($1 < $2) {a = 1}; a" | bc) -eq 1; then
 		echo '<'
 	else
 		echo '>'
@@ -101,10 +101,10 @@ degrees2radians() {
 sin() {
 	rad=$1
 	# This is needed so we can correctly detect that sin(x) == sin(n⋅TAU + x).
-	while test $(printf 'if (%s > 0) {a = 1}; a\n' $rad | bc -s) -eq 1; do
+	while test $(echo "if ($rad > 0) {a = 1}; a" | bc -s) -eq 1; do
 		rad=$(echo "$rad - $TAU" | bc | filter_output)
 	done
-	while test $(printf 'if (%s < 0) {a = 1}; a\n' $rad | bc -s) -eq 1; do
+	while test $(echo "if ($rad < 0) {a = 1}; a" | bc -s) -eq 1; do
 		rad=$(echo "$rad + $TAU" | bc | filter_output)
 	done
 
@@ -141,7 +141,7 @@ linear)
 	}
 	start=$1; end=$2; nvalues=$3
 
-	test $(printf 'if (%s != %s) {a = 1}; a\n' $start $end | bc) -eq 1 || {
+	test $(echo "if ($start != $end) {a = 1}; a" | bc) -eq 1 || {
 		echo "start and end must be different" >&2
 		exit 1
 	}
