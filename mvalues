@@ -180,8 +180,7 @@ sine)
 	rad2=$(degrees2radians $deg2)
 	sin1=$(sin $rad1)
 	sin2=$(sin $rad2)
-echo $sin1
-echo $sin2
+
 	test $(compare_values $start $end) = $(compare_values $sin1 $sin2) || {
 		echo "inconsistent sine command, sin(deg1) must compare to sin(deg2) like start compares to end" >&2
 		exit 1
