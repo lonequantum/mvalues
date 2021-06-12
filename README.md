@@ -28,7 +28,6 @@ MVALUES_ROUND: output precision (maximum number of digits after the decimal poin
 
 ## TODO
 
-- Finish sine case implementation.
 - Rewrite algorithmic parts in bc language.
 - Test under other OSes such as \*BSD.
 - Add other variations modes (+ support custom functions?)

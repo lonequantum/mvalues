@@ -155,10 +155,10 @@ linear)
 	} | round $MVALUES_ROUND | remove_trailing_zeros
 	exit 0;;
 
-# y = sin(x) * M + A, with M and A automatically computed so the first returned value is $start and the last is $end.
+# y = sin(x) * M + A, with M and A automatically computed so the first returned value is $start and the last one is $end.
 # Uses $nvalues equally separated values of x in [$deg1, $deg2]. Yes, they must be entered in degrees.
 # $peak must be given if $start == $end, otherwise just set it to 'a'.
-# $peak is the maximum value that can appear in the returned series, when sin(x) == 1. (TODO: define better as the case is implemented)
+# $peak is the maximum (or the minimum) value that could appear in the returned series (depending on the [deg1, deg2] input range), when sin(x) == 1 (or -1).
 sine)
 	test  $# -eq 6 || {
 		echo "6 args required for sine mode" >&2
@@ -178,10 +178,12 @@ sine)
 
 	rad1=$(degrees2radians $deg1)
 	rad2=$(degrees2radians $deg2)
-	sin1=$(sin $rad1)
-	sin2=$(sin $rad2)
+	sin1=$(sin $rad1 | remove_trailing_zeros)
+	sin2=$(sin $rad2 | remove_trailing_zeros)
 
-	test $(compare_values $start $end) = $(compare_values $sin1 $sin2) || {
+	c_start_end=$(compare_values $start $end)
+
+	test $c_start_end = $(compare_values $sin1 $sin2) || {
 		echo "inconsistent sine command, sin(deg1) must compare to sin(deg2) like start compares to end" >&2
 		exit 1
 	}
@@ -189,10 +191,37 @@ sine)
 	nvalues=$(expr $nvalues - 1)
 	step=$(echo "scale = $internal_scale; ($rad2 - $rad1) / $nvalues" | bc | filter_output)
 
-	if test $(compare_values $start $end) = '='; then
-		# TODO
-		echo "THIS CASE IS NOT IMPLEMENTED YET (start == end)" >&2
-		exit 1
+	if test $c_start_end = '='; then
+		test $peak != 'a' || {
+			echo "peak cannot be automatic when start == end" >&2
+			exit 1
+		}
+
+		case $(compare_values $start $peak) in
+		'=')
+			echo "warning: start == end == peak, sine mode behaving like constant mode" >&2
+			multiplier=0
+			adder=$start
+			;;
+		'>')
+			test $sin1 != '-1' || {
+				echo "peak must be > start when sin(deg1) == -1" >&2
+				exit 1
+			}
+
+			multiplier=$(echo "scale = $internal_scale; ($start - $peak) / ($sin1 + 1)" | bc | filter_output)
+			adder=$(echo "$peak + $multiplier" | bc | filter_output)
+			;;
+		'<')
+			test $sin1 != '1' || {
+				echo "peak must be < start when sin(deg1) == 1" >&2
+				exit 1
+			}
+
+			multiplier=$(echo "scale = $internal_scale; ($peak - $start) / (1 - $sin1)" | bc | filter_output)
+			adder=$(echo "$peak - $multiplier" | bc | filter_output)
+			;;
+		esac
 	else
 		test $peak = 'a' || echo "warning: peak not needed when start != end, set it to 'a' to avoid this message" >&2
 
