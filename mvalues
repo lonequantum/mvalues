@@ -62,11 +62,17 @@ filter_output() {
 bc_round='
 define r(n, d) {
 	auto r
-	if (n < 0) return (-r(-n, d))
-	scale = '$internal_scale'
-	r = n + 0.5 * 10^-d
-	scale = d
-	r = r/1
+	if (d >= 0) {
+		if (n < 0) return (-r(-n, d))
+		scale = '$internal_scale'
+		r = n + 0.5 * 10^-d
+		scale = d
+		r = r/1
+	}
+	if (d < 0) {
+		scale = -d
+		r = n/1
+	}
 	scale = '$internal_scale'
 	return (r)
 }'
@@ -74,12 +80,7 @@ define r(n, d) {
 # Rounds or truncates what it is piped, depending on $1.
 round() {
 	while read value; do
-		if test $1 -ge 0; then
-			echo "$bc_round r($value, $1)" | bc | filter_output
-		else
-			ndigits=$(expr 0 - $1)
-			echo $value | sed "s/\([-0-9]*\.\{0,1\}[0-9]\{0,$ndigits\}\)[0-9]\{0,\}/\1/"
-		fi
+		echo "$bc_round r($value, $1)" | bc | filter_output
 	done
 }
 
