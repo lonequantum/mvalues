@@ -58,7 +58,7 @@ filter_output() {
 }
 
 # The round() function in bc syntax.
-# n is the number that must be rounded to the nearest, using d digits after the decimal point.
+# n is the number that must be truncated or rounded to the nearest, using d digits after the decimal point.
 bc_round='
 define r(n, d) {
 	auto r
@@ -69,7 +69,7 @@ define r(n, d) {
 		scale = d
 		r = r/1
 	}
-	if (d < 0) {
+	if (d < 0) {  /*POSIX bc does not have else statements*/
 		scale = -d
 		r = n/1
 	}
