@@ -136,7 +136,7 @@ linear)
 	}
 	start=$1; end=$2; nvalues=$3
 
-	test $(echo "if ($start != $end) {a = 1}; a" | bc) -eq 1 || {
+	test $(compare_values $start $end) != '=' || {
 		echo "start and end must be different" >&2
 		exit 1
 	}
