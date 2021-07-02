@@ -77,13 +77,6 @@ define r(n, d) {
 	return (r)
 }'
 
-# Rounds or truncates what it is piped, depending on $1.
-round() {
-	while read value; do
-		echo "$bc_round r($value, $1)" | bc | filter_output
-	done
-}
-
 # Returns how $1 compares to $2.
 compare_values() {
 	if test $(echo "if ($1 == $2) {a = 1}; a" | bc) -eq 1; then
