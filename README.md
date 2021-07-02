@@ -1,10 +1,9 @@
 # mvalues
 Math Values Generator  
-1.0.0
+1.0.1
 
 Outputs a series of values with user-defined *start* and *end*. The difference of successive values follows the specified *mode*.
 
-THIS IS A WORK IN PROGRESS, FUNCTIONAL BUT NOT OPTIMIZED YET  
 TESTED WITH GNU BC ONLY
 
 Calling the mvalues script without argument displays this help:
@@ -29,7 +28,6 @@ MVALUES_ROUND: output precision (maximum number of digits after the decimal poin
 
 ## TODO
 
-- Rewrite algorithmic parts in bc language.
 - Test under other OSes such as \*BSD.
 - Add other variations modes (+ support custom functions?).
 - Add more checks on input.
