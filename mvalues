@@ -194,9 +194,6 @@ sine)
 		exit 1
 	}
 
-	nvalues=$(expr $nvalues - 1)
-	step=$(echo "scale = $internal_scale; ($rad2 - $rad1) / $nvalues" | bc | filter_output)
-
 	if test $c_start_end = '='; then
 		test $peak != 'a' || {
 			echo "peak cannot be automatic when start == end" >&2
@@ -235,14 +232,20 @@ sine)
 		adder=$(echo "$start - $multiplier * $sin1" | bc | filter_output)
 	fi
 
-	{
-		echo $start
-		while test $nvalues -gt 1; do
-			nvalues=$(expr $nvalues - 1)
-			echo "scale = $internal_scale; s($rad2 - $nvalues * $step) * $multiplier + $adder" | bc -l | filter_output
-		done
-		echo $end
-	} | round $MVALUES_ROUND | remove_trailing_zeros
+	echo "
+		$bc_round"'
+
+		n = '$nvalues' - 1
+		scale = '$internal_scale'
+		s = ('$rad2' - '$rad1') / n
+
+		r('$start', '$MVALUES_ROUND')
+		while(n > 1) {
+			n = n - 1
+			r(s('$rad2' - n * s) * '$multiplier' + '$adder', '$MVALUES_ROUND')
+		}
+		r('$end', '$MVALUES_ROUND')
+	' | bc -l -s | filter_output | remove_trailing_zeros
 	exit 0;;
 
 *)
