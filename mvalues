@@ -238,7 +238,7 @@ sine)
 			r(s('$rad2' - n * s) * '$multiplier' + '$adder', '$MVALUES_ROUND')
 		}
 		r('$end', '$MVALUES_ROUND')
-	' | bc -l -s | filter_output | remove_trailing_zeros
+	' | bc -l | filter_output | remove_trailing_zeros
 	exit 0;;
 
 *)
