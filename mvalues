@@ -10,22 +10,24 @@ mvalues_round_max=$(expr $internal_scale - 3) # distances rounded output values 
 mvalues_round_min=-$mvalues_round_max
 
 test -n "$1" || {
-	echo "Generates a list of math values, one per line."
-	echo "This script uses bc internally."
-	echo
-	echo "Usage:"
-	echo "mvalues constant|linear|sine {specific mode args}"
-	echo
-	echo "Examples:"
-	echo "mvalues constant 8.2 14        # 8.2, 14 times. Also accepts any string that must be repeated."
-	echo "mvalues linear 86 81.1 7       # 7 equally separated values from 86 to 81.1 (bounds included)."
-	echo "mvalues sine 45 180 15 10 a 9  # sin(x) scaled to a series that starts at 15 and ends at 10 (with a peak that is (a)utomatically computed in this case), for 9 equally separated values of x from 45 to 180 degrees (bounds included)."
-	echo
-	echo "Environment:"
-	echo "MVALUES_ROUND: output precision (maximum number of digits after the decimal point)"
-	echo "               if >= 0, the values will be rounded (to the nearest)"
-	echo "               if  < 0, the values will be truncated after -MVALUES_ROUND digits"
-	echo "               default = $mvalues_round_default, max = $mvalues_round_max, min = $mvalues_round_min"
+	cat << END
+Generates a list of math values, one per line.
+This script uses bc internally.
+
+Usage:
+mvalues constant|linear|sine {specific mode args}
+
+Examples:
+mvalues constant 8.2 14        # 8.2, 14 times. Also accepts any string that must be repeated.
+mvalues linear 86 81.1 7       # 7 equally separated values from 86 to 81.1 (bounds included).
+mvalues sine 45 180 15 10 a 9  # sin(x) scaled to a series that starts at 15 and ends at 10 (with a peak that is (a)utomatically computed in this case), for 9 equally separated values of x from 45 to 180 degrees (bounds included).
+
+Environment:
+MVALUES_ROUND: output precision (maximum number of digits after the decimal point)
+               if >= 0, the values will be rounded (to the nearest)
+               if  < 0, the values will be truncated after -MVALUES_ROUND digits
+               default = $mvalues_round_default, max = $mvalues_round_max, min = $mvalues_round_min
+END
 	exit
 }
 mode=$1
@@ -56,30 +58,24 @@ filter_output() {
 }
 
 # The round() function in bc syntax.
-# n is the number that must be rounded to the nearest, using d digits after the decimal point.
+# n is the number that must be truncated or rounded to the nearest, using d digits after the decimal point.
 bc_round='
 define r(n, d) {
 	auto r
-	if (n < 0) return (-r(-n, d))
-	scale = '$internal_scale'
-	r = n + 0.5 * 10^-d
-	scale = d
-	r = r/1
+	if (d >= 0) {
+		if (n < 0) return (-r(-n, d))
+		scale = '$internal_scale'
+		r = n + 0.5 * 10^-d
+		scale = d
+		r = r/1
+	}
+	if (d < 0) {  /*POSIX bc does not have else statements*/
+		scale = -d
+		r = n/1
+	}
 	scale = '$internal_scale'
 	return (r)
 }'
-
-# Rounds or truncates what it is piped, depending on $1.
-round() {
-	while read value; do
-		if test $1 -ge 0; then
-			echo "$bc_round r($value, $1)" | bc | filter_output
-		else
-			ndigits=$(expr 0 - $1)
-			echo $value | sed "s/\([-0-9]*\.\{0,1\}[0-9]\{0,$ndigits\}\)[0-9]\{0,\}/\1/"
-		fi
-	done
-}
 
 # Returns how $1 compares to $2.
 compare_values() {
@@ -133,7 +129,7 @@ linear)
 	}
 	start=$1; end=$2; nvalues=$3
 
-	test $(echo "if ($start != $end) {a = 1}; a" | bc) -eq 1 || {
+	test $(compare_values $start $end) != '=' || {
 		echo "start and end must be different" >&2
 		exit 1
 	}
@@ -142,17 +138,20 @@ linear)
 		exit 1
 	}
 
-	nvalues=$(expr $nvalues - 1)
-	step=$(echo "scale = $internal_scale; ($end - $start) / $nvalues" | bc | filter_output)
+	echo "
+		$bc_round"'
 
-	{
-		echo $start
-		while test $nvalues -gt 1; do
-			nvalues=$(expr $nvalues - 1)
-			echo "$end - $nvalues * $step" | bc | filter_output
-		done
-		echo $end
-	} | round $MVALUES_ROUND | remove_trailing_zeros
+		n = '$nvalues' - 1
+		scale = '$internal_scale'
+		s = ('$end' - '$start') / n
+
+		r('$start', '$MVALUES_ROUND')
+		while(n > 1) {
+			n = n - 1  /*n-- would echo the value of n*/
+			r('$end' - n * s, '$MVALUES_ROUND')
+		}
+		r('$end', '$MVALUES_ROUND')
+	' | bc | filter_output | remove_trailing_zeros
 	exit 0;;
 
 # y = sin(x) * M + A, with M and A automatically computed so the first returned value is $start and the last one is $end.
@@ -187,9 +186,6 @@ sine)
 		echo "inconsistent sine command, sin(deg1) must compare to sin(deg2) like start compares to end" >&2
 		exit 1
 	}
-
-	nvalues=$(expr $nvalues - 1)
-	step=$(echo "scale = $internal_scale; ($rad2 - $rad1) / $nvalues" | bc | filter_output)
 
 	if test $c_start_end = '='; then
 		test $peak != 'a' || {
@@ -229,14 +225,20 @@ sine)
 		adder=$(echo "$start - $multiplier * $sin1" | bc | filter_output)
 	fi
 
-	{
-		echo $start
-		while test $nvalues -gt 1; do
-			nvalues=$(expr $nvalues - 1)
-			echo "scale = $internal_scale; s($rad2 - $nvalues * $step) * $multiplier + $adder" | bc -l | filter_output
-		done
-		echo $end
-	} | round $MVALUES_ROUND | remove_trailing_zeros
+	echo "
+		$bc_round"'
+
+		n = '$nvalues' - 1
+		scale = '$internal_scale'
+		s = ('$rad2' - '$rad1') / n
+
+		r('$start', '$MVALUES_ROUND')
+		while(n > 1) {
+			n = n - 1
+			r(s('$rad2' - n * s) * '$multiplier' + '$adder', '$MVALUES_ROUND')
+		}
+		r('$end', '$MVALUES_ROUND')
+	' | bc -l -s | filter_output | remove_trailing_zeros
 	exit 0;;
 
 *)
