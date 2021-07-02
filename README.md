@@ -1,6 +1,6 @@
 # mvalues
 Math Values Generator  
-1.0.1
+1.0.2
 
 Outputs a series of values with user-defined *start* and *end*. The difference of successive values follows the specified *mode*.
 
