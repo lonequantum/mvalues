@@ -145,17 +145,20 @@ linear)
 		exit 1
 	}
 
-	nvalues=$(expr $nvalues - 1)
-	step=$(echo "scale = $internal_scale; ($end - $start) / $nvalues" | bc | filter_output)
+	echo "
+		$bc_round"'
 
-	{
-		echo $start
-		while test $nvalues -gt 1; do
-			nvalues=$(expr $nvalues - 1)
-			echo "$end - $nvalues * $step" | bc | filter_output
-		done
-		echo $end
-	} | round $MVALUES_ROUND | remove_trailing_zeros
+		n = '$nvalues' - 1
+		scale = '$internal_scale'
+		s = ('$end' - '$start') / n
+
+		r('$start', '$MVALUES_ROUND')
+		while(n > 1) {
+			n = n - 1  /*n-- would echo the value of n*/
+			r('$end' - n * s, '$MVALUES_ROUND')
+		}
+		r('$end', '$MVALUES_ROUND')
+	' | bc | filter_output | remove_trailing_zeros
 	exit 0;;
 
 # y = sin(x) * M + A, with M and A automatically computed so the first returned value is $start and the last one is $end.
